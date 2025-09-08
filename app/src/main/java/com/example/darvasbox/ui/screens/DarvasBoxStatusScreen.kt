@@ -32,6 +32,7 @@ fun DarvasBoxStatusScreen(
     val app = context.applicationContext as DarvasBoxApplication
     val workStatus by app.workScheduler.getWorkStatus().observeAsState()
     val uiState by viewModel.uiState.collectAsState()
+    val isPeriodicAnalysisRunning = viewModel.isPeriodicAnalysisRunning()
 
     var showManualTrigger by remember { mutableStateOf(false) }
 
@@ -83,6 +84,55 @@ fun DarvasBoxStatusScreen(
         }
 
         // Work Status
+        // Automatic Analysis Status Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isPeriodicAnalysisRunning)
+                    MaterialTheme.colorScheme.primaryContainer
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Automatic Analysis",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isPeriodicAnalysisRunning)
+                                "Running - Analysis every 10 minutes"
+                            else
+                                "Stopped - Manual analysis only",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isPeriodicAnalysisRunning)
+                                MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        )
+                    }
+
+                    Icon(
+                        imageVector = if (isPeriodicAnalysisRunning) Icons.Default.PlayArrow else Icons.Default.Stop,
+                        contentDescription = if (isPeriodicAnalysisRunning) "Running" else "Stopped",
+                        tint = if (isPeriodicAnalysisRunning)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+        }
+
         Card(
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -188,30 +238,129 @@ fun DarvasBoxStatusScreen(
             }
         }
 
-        // Control Buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Button(
-                onClick = {
-                    app.workScheduler.cancelPeriodicAnalysis()
-                    app.workScheduler.schedulePeriodicAnalysis()
-                },
-                modifier = Modifier.weight(1f)
+        // Error display section
+        uiState.error?.let { error ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
             ) {
-                Text("Restart Analysis")
-            }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Error",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
 
-            OutlinedButton(
-                onClick = { showManualTrigger = !showManualTrigger },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Manual Trigger")
+                    IconButton(
+                        onClick = { viewModel.clearError() }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close error",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
             }
         }
 
-        // Complete Analysis Section
+        // Control Buttons
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Automatic Analysis Controls
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (isPeriodicAnalysisRunning) {
+                    Button(
+                        onClick = { viewModel.stopPeriodicAnalysis() },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Stop,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Stop Automatic Analysis")
+                    }
+                } else {
+                    Button(
+                        onClick = { viewModel.startPeriodicAnalysis() },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Start Automatic Analysis")
+                    }
+                }
+            }
+
+            // Manual Controls
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = {
+                        app.workScheduler.cancelPeriodicAnalysis()
+                        app.workScheduler.schedulePeriodicAnalysis()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Restart Analysis")
+                }
+
+                Button(
+                    onClick = { viewModel.triggerCompleteAnalysis(isAutomaticTrigger = false) },
+                    modifier = Modifier.weight(1f),
+                    enabled = !uiState.isLoading
+                ) {
+                    if (uiState.isLoading) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text("Analyzing...")
+                        }
+                    } else {
+                        Text("Run Complete Analysis")
+                    }
+                }
+            }
+        }
+
+        // Manual Trigger Section
         if (showManualTrigger) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -223,81 +372,36 @@ fun DarvasBoxStatusScreen(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "Complete Analysis",
+                        text = "Manual Options",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "This will fetch all symbols from Google Sheets and perform complete Darvas Box analysis. Results will be displayed on a new page.",
+                        text = "Additional manual control options and settings.",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
 
-                    Button(
-                        onClick = { viewModel.triggerCompleteAnalysis() },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !uiState.isLoading
+                    OutlinedButton(
+                        onClick = { showManualTrigger = false },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        if (uiState.isLoading) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp
-                                )
-                                Text("Analyzing...")
-                            }
-                        } else {
-                            Text("Run Complete Analysis")
-                        }
-                    }
-
-                    // Only show error display within Manual Trigger section
-                    uiState.error?.let { error ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Error",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                    Text(
-                                        text = error,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onErrorContainer
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { viewModel.clearError() }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Close error",
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            }
-                        }
+                        Text("Hide Manual Options")
                     }
                 }
+            }
+        } else {
+            OutlinedButton(
+                onClick = { showManualTrigger = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ExpandMore,
+                    contentDescription = "Expand",
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Show Manual Options")
             }
         }
     }

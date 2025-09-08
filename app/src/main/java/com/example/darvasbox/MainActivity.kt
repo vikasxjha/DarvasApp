@@ -54,7 +54,10 @@ class MainActivity : ComponentActivity() {
 
                 // Initialize ViewModel at MainActivity level
                 val viewModel: DarvasBoxViewModel = viewModel(
-                    factory = DarvasBoxViewModelFactory(app.manualAnalysisService)
+                    factory = DarvasBoxViewModelFactory(
+                        app.manualAnalysisService,
+                        app.notificationHelper
+                    )
                 )
                 val uiState by viewModel.uiState.collectAsState()
 

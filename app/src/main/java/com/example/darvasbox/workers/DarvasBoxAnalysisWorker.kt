@@ -47,6 +47,8 @@ class DarvasBoxAnalysisWorker(
 
             // Analyze each symbol
             var newSignalsCount = 0
+            val allAnalysisResults = mutableListOf<com.example.darvasbox.data.model.StockAnalysisResult>()
+
             for (symbol in symbols) {
                 try {
                     // Small delay between API calls to avoid rate limiting
@@ -58,6 +60,19 @@ class DarvasBoxAnalysisWorker(
                         val stockData = analysisResult.getOrNull()!!
                         val currentSignal = stockData.signal
                         val previousSignal = previousSignals[symbol]
+
+                        // Add to complete results list
+                        allAnalysisResults.add(
+                            com.example.darvasbox.data.model.StockAnalysisResult(
+                                symbol = symbol,
+                                currentPrice = stockData.price,
+                                signal = currentSignal,
+                                boxHigh = stockData.boxHigh,
+                                boxLow = stockData.boxLow,
+                                volume = stockData.volume,
+                                analysisSuccess = true
+                            )
+                        )
 
                         // Check if this is a new BUY or SELL signal
                         if ((currentSignal == "BUY" || currentSignal == "SELL") &&
@@ -81,14 +96,66 @@ class DarvasBoxAnalysisWorker(
 
                     } else {
                         Log.e(TAG, "Failed to analyze $symbol: ${analysisResult.exceptionOrNull()?.message}")
+
+                        // Add error result
+                        allAnalysisResults.add(
+                            com.example.darvasbox.data.model.StockAnalysisResult(
+                                symbol = symbol,
+                                currentPrice = null,
+                                signal = "ERROR",
+                                boxHigh = null,
+                                boxLow = null,
+                                volume = null,
+                                analysisSuccess = false,
+                                errorMessage = analysisResult.exceptionOrNull()?.message
+                            )
+                        )
                     }
 
                 } catch (e: Exception) {
                     Log.e(TAG, "Error analyzing $symbol", e)
+
+                    // Add error result
+                    allAnalysisResults.add(
+                        com.example.darvasbox.data.model.StockAnalysisResult(
+                            symbol = symbol,
+                            currentPrice = null,
+                            signal = "ERROR",
+                            boxHigh = null,
+                            boxLow = null,
+                            volume = null,
+                            analysisSuccess = false,
+                            errorMessage = e.message
+                        )
+                    )
                 }
             }
 
-            Log.d(TAG, "Analysis completed. Found $newSignalsCount new signals at ${getCurrentTimeIST()}")
+            // Send completion notification with analysis summary
+            val buySignals = allAnalysisResults.count { it.signal == "BUY" }
+            val sellSignals = allAnalysisResults.count { it.signal == "SELL" }
+
+            // Create analysis result for notification
+            val analysisResultForNotification = com.example.darvasbox.data.model.SheetsAnalysisResult(
+                symbols = symbols,
+                timestamp = getCurrentTimeIST(),
+                success = true,
+                analysisResults = allAnalysisResults
+            )
+
+            // Convert to JSON for notification
+            val gson = com.google.gson.Gson()
+            val analysisDataJson = gson.toJson(analysisResultForNotification)
+
+            // Show completion notification
+            notificationHelper.showAnalysisCompleteNotification(
+                symbolCount = symbols.size,
+                buySignals = buySignals,
+                sellSignals = sellSignals,
+                analysisData = analysisDataJson
+            )
+
+            Log.d(TAG, "Analysis completed. Found $newSignalsCount new signals, $buySignals BUY, $sellSignals SELL at ${getCurrentTimeIST()}")
             Result.success()
 
         } catch (e: Exception) {

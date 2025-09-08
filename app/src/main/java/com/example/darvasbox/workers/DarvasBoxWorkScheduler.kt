@@ -2,6 +2,7 @@ package com.example.darvasbox.workers
 
 import android.content.Context
 import androidx.work.*
+import com.example.darvasbox.data.preferences.AnalysisPreferences
 import java.util.concurrent.TimeUnit
 
 class DarvasBoxWorkScheduler(private val context: Context) {
@@ -11,15 +12,19 @@ class DarvasBoxWorkScheduler(private val context: Context) {
         const val WORK_TAG = "darvas_box_periodic"
     }
 
+    private val preferences = AnalysisPreferences(context)
+
     fun schedulePeriodicAnalysis() {
+        val intervalMinutes = preferences.analysisIntervalMinutes
+
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .setRequiresBatteryNotLow(true)
             .build()
 
         val workRequest = PeriodicWorkRequestBuilder<DarvasBoxAnalysisWorker>(
-            10, TimeUnit.MINUTES, // Repeat every 10 minutes
-            5, TimeUnit.MINUTES   // Flex period of 5 minutes
+            intervalMinutes, TimeUnit.MINUTES,
+            (intervalMinutes / 2).coerceAtLeast(15), TimeUnit.MINUTES // Flex period
         )
             .setConstraints(constraints)
             .addTag(WORK_TAG)
@@ -32,9 +37,16 @@ class DarvasBoxWorkScheduler(private val context: Context) {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.REPLACE, // Replace to update interval
             workRequest
         )
+    }
+
+    fun updateAnalysisInterval(intervalMinutes: Long) {
+        preferences.analysisIntervalMinutes = intervalMinutes
+        // Reschedule with new interval
+        cancelPeriodicAnalysis()
+        schedulePeriodicAnalysis()
     }
 
     fun cancelPeriodicAnalysis() {

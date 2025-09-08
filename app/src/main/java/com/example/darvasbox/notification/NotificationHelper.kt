@@ -18,6 +18,13 @@ class NotificationHelper(private val context: Context) {
         const val CHANNEL_ID = "darvas_box_signals"
         const val CHANNEL_NAME = "Darvas Box Trading Signals"
         const val CHANNEL_DESCRIPTION = "Notifications for new BUY/SELL signals from Darvas Box analysis"
+        const val ANALYSIS_CHANNEL_ID = "darvas_box_analysis"
+        const val ANALYSIS_CHANNEL_NAME = "Darvas Box Analysis Complete"
+        const val ANALYSIS_CHANNEL_DESCRIPTION = "Notifications when periodic analysis is completed"
+
+        // Intent extras for deep linking
+        const val EXTRA_SHOW_RESULTS = "show_analysis_results"
+        const val EXTRA_ANALYSIS_DATA = "analysis_data"
     }
 
     init {
@@ -26,7 +33,10 @@ class NotificationHelper(private val context: Context) {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val notificationManager = context.getSystemService(NotificationManager::class.java)
+
+            // Create signal channel
+            val signalChannel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_HIGH
@@ -36,8 +46,19 @@ class NotificationHelper(private val context: Context) {
                 enableLights(true)
             }
 
-            val notificationManager = context.getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
+            // Create analysis completion channel
+            val analysisChannel = NotificationChannel(
+                ANALYSIS_CHANNEL_ID,
+                ANALYSIS_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = ANALYSIS_CHANNEL_DESCRIPTION
+                enableVibration(true)
+                enableLights(true)
+            }
+
+            notificationManager.createNotificationChannel(signalChannel)
+            notificationManager.createNotificationChannel(analysisChannel)
         }
     }
 
@@ -113,5 +134,65 @@ class NotificationHelper(private val context: Context) {
             volume >= 1_000 -> "${String.format("%.1f", volume / 1_000.0)}K"
             else -> volume.toString()
         }
+    }
+
+    fun showAnalysisCompleteNotification(
+        symbolCount: Int,
+        buySignals: Int,
+        sellSignals: Int,
+        analysisData: String // JSON string of analysis results
+    ) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(EXTRA_SHOW_RESULTS, true)
+            putExtra(EXTRA_ANALYSIS_DATA, analysisData)
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            "analysis_complete".hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = "📊 Analysis Complete"
+        val message = "Analyzed $symbolCount stocks • $buySignals BUY • $sellSignals SELL signals found"
+        val bigMessage = buildAnalysisNotificationMessage(symbolCount, buySignals, sellSignals)
+
+        val notification = NotificationCompat.Builder(context, ANALYSIS_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigMessage))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .addAction(
+                android.R.drawable.ic_menu_view,
+                "View Results",
+                pendingIntent
+            )
+            .build()
+
+        try {
+            NotificationManagerCompat.from(context).notify(
+                "analysis_complete".hashCode(),
+                notification
+            )
+        } catch (e: SecurityException) {
+            android.util.Log.w("NotificationHelper", "Notification permission not granted", e)
+        }
+    }
+
+    private fun buildAnalysisNotificationMessage(symbolCount: Int, buySignals: Int, sellSignals: Int): String {
+        return """
+            📈 Periodic Analysis Results
+            
+            • Analyzed $symbolCount stocks from Google Sheets
+            • Found $buySignals BUY signals
+            • Found $sellSignals SELL signals
+            
+            Tap to view detailed results with price targets and volume data.
+        """.trimIndent()
     }
 }

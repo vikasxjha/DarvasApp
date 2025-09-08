@@ -56,6 +56,9 @@ dependencies {
     implementation(libs.retrofit.gson)
     implementation(libs.gson)
 
+    // HTTP client for Google Sheets
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // Database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
@@ -67,16 +70,20 @@ dependencies {
     // ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
-
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)
+
+    // Compose LiveData integration
+    implementation("androidx.compose.runtime:runtime-livedata:1.5.4")
+
+    // Material Icons Extended
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
 
     // Testing
     testImplementation(libs.junit)

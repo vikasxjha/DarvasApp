@@ -60,6 +60,13 @@ class MainActivity : ComponentActivity() {
 
                 var currentScreen by remember { mutableStateOf<Screen>(Screen.Main) }
 
+                // Handle deep linking from notifications
+                LaunchedEffect(intent) {
+                    handleNotificationIntent(intent) { analysisResult ->
+                        currentScreen = Screen.Results(analysisResult)
+                    }
+                }
+
                 // Handle navigation based on ViewModel state
                 LaunchedEffect(uiState.shouldNavigateToResults) {
                     if (uiState.shouldNavigateToResults && uiState.analysisResult != null) {
@@ -73,6 +80,13 @@ class MainActivity : ComponentActivity() {
                         is Screen.Main -> {
                             DarvasBoxStatusScreen(
                                 viewModel = viewModel,
+                                onNavigateToSettings = { currentScreen = Screen.Settings },
+                                modifier = Modifier.padding(innerPadding)
+                            )
+                        }
+                        is Screen.Settings -> {
+                            com.example.darvasbox.ui.screens.SettingsScreen(
+                                onBackClick = { currentScreen = Screen.Main },
                                 modifier = Modifier.padding(innerPadding)
                             )
                         }
@@ -91,9 +105,31 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun handleNotificationIntent(
+        intent: android.content.Intent,
+        onNavigateToResults: (com.example.darvasbox.data.model.SheetsAnalysisResult) -> Unit
+    ) {
+        if (intent.getBooleanExtra(com.example.darvasbox.notification.NotificationHelper.EXTRA_SHOW_RESULTS, false)) {
+            val analysisDataJson = intent.getStringExtra(com.example.darvasbox.notification.NotificationHelper.EXTRA_ANALYSIS_DATA)
+            if (analysisDataJson != null) {
+                try {
+                    val gson = com.google.gson.Gson()
+                    val analysisResult = gson.fromJson(
+                        analysisDataJson,
+                        com.example.darvasbox.data.model.SheetsAnalysisResult::class.java
+                    )
+                    onNavigateToResults(analysisResult)
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Failed to parse analysis data", e)
+                }
+            }
+        }
+    }
 }
 
 sealed class Screen {
     object Main : Screen()
+    object Settings : Screen()
     data class Results(val result: com.example.darvasbox.data.model.SheetsAnalysisResult) : Screen()
 }

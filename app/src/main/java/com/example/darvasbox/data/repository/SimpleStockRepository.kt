@@ -3,14 +3,15 @@ package com.example.darvasbox.data.repository
 import com.example.darvasbox.data.dao.StockDataDao
 import com.example.darvasbox.data.model.StockData
 import com.example.darvasbox.data.network.StockApiService
+import com.example.darvasbox.data.network.YFinanceService
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.firstOrNull
 import kotlin.math.abs
 import kotlin.random.Random
 
 class SimpleStockRepository(
     private val apiService: StockApiService,
-    private val stockDao: StockDataDao
+    private val stockDao: StockDataDao,
+    private val yfinanceService: YFinanceService = YFinanceService()
 ) {
 
     fun getRecentStocks(): Flow<List<StockData>> = stockDao.getRecentStocks()
@@ -25,10 +26,26 @@ class SimpleStockRepository(
                 return Result.success(cachedStock)
             }
 
-            // For demo purposes, generate realistic mock data using proper Darvas Box algorithm
-            val mockData = createRealisticMockStockData(symbol)
-            stockDao.insertStock(mockData)
-            Result.success(mockData)
+            // Fetch real data from yfinance
+            val yfinanceResult = yfinanceService.getStockData(symbol)
+
+            if (yfinanceResult.isSuccess) {
+                val yfinanceData = yfinanceResult.getOrNull()!!
+                val stockData = createStockDataFromYFinance(yfinanceData)
+                stockDao.insertStock(stockData)
+                Result.success(stockData)
+            } else {
+                // Fallback to cached data if available
+                if (cachedStock != null) {
+                    Result.success(cachedStock)
+                } else {
+                    // Last resort: create mock data with a warning
+                    println("DEBUG: Using fallback mock data for $symbol - yfinance failed: ${yfinanceResult.exceptionOrNull()?.message}")
+                    val mockData = createRealisticMockStockData(symbol)
+                    stockDao.insertStock(mockData)
+                    Result.success(mockData)
+                }
+            }
 
         } catch (e: Exception) {
             // Try to return cached data as fallback
@@ -39,6 +56,46 @@ class SimpleStockRepository(
                 Result.failure(e)
             }
         }
+    }
+
+    private fun createStockDataFromYFinance(yfinanceData: com.example.darvasbox.data.network.YFinanceData): StockData {
+        // Convert historical data to PriceBar format for Darvas analysis
+        val priceData = yfinanceData.historicalData.map { historical ->
+            PriceBar(
+                high = historical.high,
+                low = historical.low,
+                close = historical.close,
+                volume = historical.volume
+            )
+        }
+
+        // Apply proper Darvas Box algorithm to real data
+        val darvasAnalysis = if (priceData.isNotEmpty()) {
+            calculateDarvasBox(priceData)
+        } else {
+            // If no historical data, create basic analysis from current data
+            DarvasAnalysis(
+                boxHigh = yfinanceData.dayHigh,
+                boxLow = yfinanceData.dayLow,
+                signal = "IGNORE"
+            )
+        }
+
+        val currentPrice = yfinanceData.currentPrice
+        val previousClose = yfinanceData.previousClose
+        val change = currentPrice - previousClose
+        val changePercent = if (previousClose > 0) (change / previousClose) * 100 else 0.0
+
+        return StockData(
+            symbol = yfinanceData.symbol.uppercase(),
+            price = currentPrice,
+            boxHigh = darvasAnalysis.boxHigh,
+            boxLow = darvasAnalysis.boxLow,
+            signal = darvasAnalysis.signal,
+            volume = yfinanceData.volume,
+            change = change,
+            changePercent = changePercent
+        )
     }
 
     private fun createRealisticMockStockData(symbol: String): StockData {
@@ -204,21 +261,24 @@ class SimpleStockRepository(
     }
 
     private fun isDataFresh(timestamp: Long): Boolean {
-        val fiveMinutes = 5 * 60 * 1000 // 5 minutes in milliseconds
-        return System.currentTimeMillis() - timestamp < fiveMinutes
+        val currentTime = System.currentTimeMillis()
+        val timeDiff = currentTime - timestamp
+
+        // Consider data fresh if it's less than 5 minutes old
+        return timeDiff < 5 * 60 * 1000
     }
-
-    // Data classes for internal calculations
-    private data class PriceBar(
-        val high: Double,
-        val low: Double,
-        val close: Double,
-        val volume: Long
-    )
-
-    private data class DarvasAnalysis(
-        val boxHigh: Double,
-        val boxLow: Double,
-        val signal: String
-    )
 }
+
+// Data classes for Darvas Box analysis
+data class PriceBar(
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    val volume: Long
+)
+
+data class DarvasAnalysis(
+    val boxHigh: Double,
+    val boxLow: Double,
+    val signal: String
+)

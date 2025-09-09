@@ -30,7 +30,6 @@ fun DarvasBoxStatusScreen(
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as DarvasBoxApplication
-    val workStatus by app.workScheduler.getWorkStatus().observeAsState()
     val uiState by viewModel.uiState.collectAsState()
     val isPeriodicAnalysisRunning = viewModel.isPeriodicAnalysisRunning()
 
@@ -131,111 +130,6 @@ fun DarvasBoxStatusScreen(
             }
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text(
-                    text = "Periodic Work Status",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                workStatus?.let { workInfoList ->
-                    if (workInfoList.isNotEmpty()) {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(workInfoList) { workInfo ->
-                                WorkInfoItem(workInfo = workInfo)
-                            }
-                        }
-                    } else {
-                        Text(
-                            text = "No work scheduled",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                } ?: run {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        }
-
-        // Google Sheets Info
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text(
-                    text = "Configuration",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Sheet URL",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Google Sheets (Column G filter)",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Configured",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Analysis Frequency",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Every 10 minutes",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-
-                    Icon(
-                        imageVector = Icons.Default.Schedule,
-                        contentDescription = "Scheduled",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        }
-
         // Error display section
         uiState.error?.let { error ->
             Card(
@@ -321,39 +215,24 @@ fun DarvasBoxStatusScreen(
             }
 
             // Manual Controls
-            Row(
+            Button(
+                onClick = { viewModel.triggerCompleteAnalysis(isAutomaticTrigger = false) },
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                enabled = !uiState.isLoading
             ) {
-                Button(
-                    onClick = {
-                        app.workScheduler.cancelPeriodicAnalysis()
-                        app.workScheduler.schedulePeriodicAnalysis()
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Restart Analysis")
-                }
-
-                Button(
-                    onClick = { viewModel.triggerCompleteAnalysis(isAutomaticTrigger = false) },
-                    modifier = Modifier.weight(1f),
-                    enabled = !uiState.isLoading
-                ) {
-                    if (uiState.isLoading) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp
-                            )
-                            Text("Analyzing...")
-                        }
-                    } else {
-                        Text("Run Complete Analysis")
+                if (uiState.isLoading) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Text("Analyzing...")
                     }
+                } else {
+                    Text("Run Complete Analysis")
                 }
             }
         }
@@ -536,7 +415,7 @@ private fun StockAnalysisResultItem(stockResult: StockAnalysisResult) {
                 ) {
                     Column {
                         Text(
-                            text = "Price: ₹${stockResult.currentPrice?.let { "%.2f".format(it) } ?: "N/A"}",
+                            text = "Price: ��${stockResult.currentPrice?.let { "%.2f".format(it) } ?: "N/A"}",
                             style = MaterialTheme.typography.bodySmall
                         )
                         stockResult.volume?.let { volume ->
@@ -589,48 +468,60 @@ private fun WorkInfoItem(workInfo: WorkInfo) {
             }
         )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(12.dp)
         ) {
-            Column {
-                Text(
-                    text = "Work Status: ${workInfo.state.name}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Text(
-                    text = "Tags: ${workInfo.tags.joinToString(", ")}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-            }
-
-            val icon = when (workInfo.state) {
-                WorkInfo.State.RUNNING -> Icons.Default.PlayArrow
-                WorkInfo.State.SUCCEEDED -> Icons.Default.CheckCircle
-                WorkInfo.State.FAILED -> Icons.Default.Error
-                WorkInfo.State.CANCELLED -> Icons.Default.Cancel
-                else -> Icons.Default.Schedule
-            }
-
-            val iconColor = when (workInfo.state) {
-                WorkInfo.State.RUNNING -> MaterialTheme.colorScheme.primary
-                WorkInfo.State.SUCCEEDED -> MaterialTheme.colorScheme.tertiary
-                WorkInfo.State.FAILED -> MaterialTheme.colorScheme.error
-                WorkInfo.State.CANCELLED -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.outline
-            }
-
-            Icon(
-                imageVector = icon,
-                contentDescription = workInfo.state.name,
-                tint = iconColor
+            Text(
+                text = "Work ID: ${workInfo.id}",
+                style = MaterialTheme.typography.bodySmall
             )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "State: ${workInfo.state}",
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            workInfo.state.run {
+                if (this == WorkInfo.State.RUNNING) {
+                    Text(
+                        text = "In Progress...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else if (this == WorkInfo.State.SUCCEEDED) {
+                    Text(
+                        text = "Completed",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                } else if (this == WorkInfo.State.FAILED || this == WorkInfo.State.CANCELLED) {
+                    Text(
+                        text = "Failed",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Display output or error message
+            workInfo.outputData.getString("result")?.let { result ->
+                Text(
+                    text = "Result: $result",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            workInfo.outputData.getString("error")?.let { error ->
+                Text(
+                    text = "Error: $error",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }

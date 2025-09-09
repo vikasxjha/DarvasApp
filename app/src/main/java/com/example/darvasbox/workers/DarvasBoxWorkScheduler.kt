@@ -53,6 +53,16 @@ class DarvasBoxWorkScheduler(private val context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
     }
 
+    fun isPeriodicAnalysisScheduled(): Boolean {
+        val workInfos = WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork(WORK_NAME)
+            .get()
+
+        return workInfos.any { workInfo ->
+            workInfo.state == WorkInfo.State.ENQUEUED || workInfo.state == WorkInfo.State.RUNNING
+        }
+    }
+
     fun getWorkStatus() = WorkManager.getInstance(context)
         .getWorkInfosForUniqueWorkLiveData(WORK_NAME)
 

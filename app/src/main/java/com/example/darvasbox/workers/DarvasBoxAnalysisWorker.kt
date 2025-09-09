@@ -166,8 +166,8 @@ class DarvasBoxAnalysisWorker(
 
     private fun getCurrentTimeIST(): String {
         val calendar = Calendar.getInstance(TimeZone.getTimeZone("Asia/Kolkata"))
-        val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss IST", Locale.getDefault())
+        val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         formatter.timeZone = TimeZone.getTimeZone("Asia/Kolkata")
-        return formatter.format(calendar.time)
+        return "${formatter.format(calendar.time)} IST"
     }
 }

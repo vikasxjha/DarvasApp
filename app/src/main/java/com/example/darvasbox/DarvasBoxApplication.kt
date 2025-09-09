@@ -84,6 +84,9 @@ class DarvasBoxApplication : Application(), Configuration.Provider {
         // Initialize and start work scheduler
         workScheduler = DarvasBoxWorkScheduler(this)
         workScheduler.schedulePeriodicAnalysis()
+
+        // Schedule daily analysis at 10:45 PM IST
+        workScheduler.scheduleDailyAnalysis()
     }
 
     override val workManagerConfiguration: Configuration

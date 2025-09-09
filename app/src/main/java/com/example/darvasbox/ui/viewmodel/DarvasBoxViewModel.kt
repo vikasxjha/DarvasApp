@@ -1,78 +1,75 @@
 package com.example.darvasbox.ui.viewmodel
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.darvasbox.data.model.SheetsAnalysisResult
 import com.example.darvasbox.data.service.ManualAnalysisService
 import com.example.darvasbox.notification.NotificationHelper
+import com.example.darvasbox.workers.DarvasBoxWorkScheduler
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.Job
 import com.google.gson.Gson
 import java.text.SimpleDateFormat
 import java.util.*
 
 class DarvasBoxViewModel(
     private val manualAnalysisService: ManualAnalysisService,
-    private val notificationHelper: NotificationHelper
+    private val notificationHelper: NotificationHelper,
+    private val workScheduler: DarvasBoxWorkScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DarvasBoxUiState())
     val uiState: StateFlow<DarvasBoxUiState> = _uiState.asStateFlow()
 
-    // Periodic analysis job
-    private var periodicAnalysisJob: Job? = null
-    private var isPeriodicAnalysisEnabled = false
+    // Add StateFlow to track periodic analysis status
+    private val _isPeriodicAnalysisRunning = MutableStateFlow(false)
+    val isPeriodicAnalysisRunning: StateFlow<Boolean> = _isPeriodicAnalysisRunning.asStateFlow()
 
     init {
-        // Start periodic analysis by default after a short delay
-        // This ensures all dependencies are properly initialized
-        startPeriodicAnalysis()
-    }
-
-    fun startPeriodicAnalysis() {
-        if (isPeriodicAnalysisEnabled) return // Already running
-
-        isPeriodicAnalysisEnabled = true
-        periodicAnalysisJob?.cancel()
-
-        periodicAnalysisJob = viewModelScope.launch {
-            // Add initial delay to ensure proper initialization
-            delay(5000L) // 5 seconds initial delay
-
-            while (isPeriodicAnalysisEnabled) {
-                // Only trigger if not already loading to avoid overlapping analyses
-                if (!_uiState.value.isLoading) {
-                    try {
-                        android.util.Log.d("DarvasBoxViewModel", "Starting automatic analysis...")
-                        triggerCompleteAnalysis(isAutomaticTrigger = true)
-                    } catch (e: Exception) {
-                        android.util.Log.e("DarvasBoxViewModel", "Error in automatic analysis", e)
-                    }
-                }
-
-                // Wait 10 minutes before next analysis
-                delay(10 * 60 * 1000L) // 10 minutes in milliseconds
-            }
+        // Check initial WorkManager status and start if needed
+        updatePeriodicAnalysisStatus()
+        // Start periodic analysis by default using WorkManager
+        if (!isPeriodicAnalysisRunning()) {
+            startPeriodicAnalysis()
         }
     }
 
-    fun stopPeriodicAnalysis() {
-        isPeriodicAnalysisEnabled = false
-        periodicAnalysisJob?.cancel()
-        periodicAnalysisJob = null
+    private fun updatePeriodicAnalysisStatus() {
+        val isRunning = workScheduler.isPeriodicAnalysisScheduled()
+        _isPeriodicAnalysisRunning.value = isRunning
+        android.util.Log.d("DarvasBoxViewModel", "Periodic analysis status updated: $isRunning")
     }
 
-    fun isPeriodicAnalysisRunning(): Boolean = isPeriodicAnalysisEnabled
+    fun startPeriodicAnalysis() {
+        // Use WorkManager for background persistence
+        workScheduler.schedulePeriodicAnalysis()
+        updatePeriodicAnalysisStatus()
+        android.util.Log.d("DarvasBoxViewModel", "Started periodic analysis via WorkManager")
+    }
+
+    fun stopPeriodicAnalysis() {
+        // Cancel WorkManager periodic work
+        workScheduler.cancelPeriodicAnalysis()
+        updatePeriodicAnalysisStatus()
+        android.util.Log.d("DarvasBoxViewModel", "Stopped periodic analysis via WorkManager")
+    }
+
+    fun refreshPeriodicAnalysisStatus() {
+        updatePeriodicAnalysisStatus()
+    }
+
+    fun isPeriodicAnalysisRunning(): Boolean {
+        return workScheduler.isPeriodicAnalysisScheduled()
+    }
 
     fun triggerCompleteAnalysis(isAutomaticTrigger: Boolean = false) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             try {
+                android.util.Log.d("DarvasBoxViewModel", "Starting complete analysis (automatic: $isAutomaticTrigger)")
+
                 // This single call does everything:
                 // 1. Fetches symbols from Google Sheets
                 // 2. Analyzes each symbol for Darvas Box signals
@@ -86,9 +83,10 @@ class DarvasBoxViewModel(
                     shouldNavigateToResults = result.success && !isAutomaticTrigger // Navigate only if successful and manual
                 )
 
-                // Send notification when analysis completes (especially for automatic triggers)
-                if (result.success && isAutomaticTrigger) {
+                // ALWAYS send notification when complete analysis finishes (both manual and automatic)
+                if (result.success) {
                     sendAnalysisCompleteNotification(result)
+                    android.util.Log.d("DarvasBoxViewModel", "Notification sent for completed analysis")
                 }
             } catch (e: Exception) {
                 val errorResult = SheetsAnalysisResult(
@@ -102,8 +100,10 @@ class DarvasBoxViewModel(
                     isLoading = false,
                     analysisResult = errorResult,
                     error = e.message,
-                    shouldNavigateToResults = false // Ensure navigation state is false on error
+                    shouldNavigateToResults = false
                 )
+
+                android.util.Log.e("DarvasBoxViewModel", "Complete analysis failed", e)
             }
         }
     }
@@ -127,8 +127,9 @@ class DarvasBoxViewModel(
                 sellSignals = sellSignals,
                 analysisData = analysisDataJson
             )
+
+            android.util.Log.d("DarvasBoxViewModel", "Analysis complete notification sent: $symbolCount stocks, $buySignals BUY, $sellSignals SELL")
         } catch (e: Exception) {
-            // Log error but don't crash the app
             android.util.Log.e("DarvasBoxViewModel", "Failed to send notification", e)
         }
     }
@@ -164,12 +165,13 @@ data class DarvasBoxUiState(
 
 class DarvasBoxViewModelFactory(
     private val manualAnalysisService: ManualAnalysisService,
-    private val notificationHelper: NotificationHelper
+    private val notificationHelper: NotificationHelper,
+    private val workScheduler: DarvasBoxWorkScheduler
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DarvasBoxViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return DarvasBoxViewModel(manualAnalysisService, notificationHelper) as T
+            return DarvasBoxViewModel(manualAnalysisService, notificationHelper, workScheduler) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

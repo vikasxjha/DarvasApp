@@ -56,7 +56,8 @@ class MainActivity : ComponentActivity() {
                 val viewModel: DarvasBoxViewModel = viewModel(
                     factory = DarvasBoxViewModelFactory(
                         app.manualAnalysisService,
-                        app.notificationHelper
+                        app.notificationHelper,
+                        app.workScheduler
                     )
                 )
                 val uiState by viewModel.uiState.collectAsState()

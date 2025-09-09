@@ -34,8 +34,6 @@ fun DarvasBoxStatusScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isPeriodicAnalysisRunning = viewModel.isPeriodicAnalysisRunning()
 
-    var showManualTrigger by remember { mutableStateOf(false) }
-
     Column(
         modifier = modifier.padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -360,49 +358,34 @@ fun DarvasBoxStatusScreen(
             }
         }
 
-        // Manual Trigger Section
-        if (showManualTrigger) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Manual Options",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "Additional manual control options and settings.",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+        // Automatic Run Button at the bottom
+        Spacer(modifier = Modifier.height(16.dp))
 
-                    OutlinedButton(
-                        onClick = { showManualTrigger = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Hide Manual Options")
-                    }
+        Button(
+            onClick = {
+                // Start automatic analysis if not running, otherwise trigger a manual run
+                if (!isPeriodicAnalysisRunning) {
+                    viewModel.startPeriodicAnalysis()
+                } else {
+                    viewModel.triggerCompleteAnalysis(isAutomaticTrigger = false)
                 }
-            }
-        } else {
-            OutlinedButton(
-                onClick = { showManualTrigger = true },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ExpandMore,
-                    contentDescription = "Expand",
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Show Manual Options")
-            }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Icon(
+                imageVector = if (isPeriodicAnalysisRunning) Icons.Default.PlayCircle else Icons.Default.PlayArrow,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Automatic Run",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

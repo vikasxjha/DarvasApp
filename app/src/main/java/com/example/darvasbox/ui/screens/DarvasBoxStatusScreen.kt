@@ -182,35 +182,17 @@ fun DarvasBoxStatusScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (isPeriodicAnalysisRunning) {
-                    Button(
-                        onClick = { viewModel.stopPeriodicAnalysis() },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Stop,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Stop Automatic Analysis")
-                    }
-                } else {
-                    Button(
-                        onClick = { viewModel.startPeriodicAnalysis() },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Start Automatic Analysis")
-                    }
+                Button(
+                    onClick = { viewModel.startPeriodicAnalysis() },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Start Automatic Analysis")
                 }
             }
 
@@ -468,60 +450,48 @@ private fun WorkInfoItem(workInfo: WorkInfo) {
             }
         )
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Work ID: ${workInfo.id}",
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "State: ${workInfo.state}",
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            workInfo.state.run {
-                if (this == WorkInfo.State.RUNNING) {
-                    Text(
-                        text = "In Progress...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                } else if (this == WorkInfo.State.SUCCEEDED) {
-                    Text(
-                        text = "Completed",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                } else if (this == WorkInfo.State.FAILED || this == WorkInfo.State.CANCELLED) {
-                    Text(
-                        text = "Failed",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Display output or error message
-            workInfo.outputData.getString("result")?.let { result ->
+            Column {
                 Text(
-                    text = "Result: $result",
-                    style = MaterialTheme.typography.bodySmall
+                    text = "Work Status: ${workInfo.state.name}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
                 )
-            }
 
-            workInfo.outputData.getString("error")?.let { error ->
                 Text(
-                    text = "Error: $error",
+                    text = "Tags: ${workInfo.tags.joinToString(", ")}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
             }
+
+            val icon = when (workInfo.state) {
+                WorkInfo.State.RUNNING -> Icons.Default.PlayArrow
+                WorkInfo.State.SUCCEEDED -> Icons.Default.CheckCircle
+                WorkInfo.State.FAILED -> Icons.Default.Error
+                WorkInfo.State.CANCELLED -> Icons.Default.Cancel
+                else -> Icons.Default.Schedule
+            }
+
+            val iconColor = when (workInfo.state) {
+                WorkInfo.State.RUNNING -> MaterialTheme.colorScheme.primary
+                WorkInfo.State.SUCCEEDED -> MaterialTheme.colorScheme.tertiary
+                WorkInfo.State.FAILED -> MaterialTheme.colorScheme.error
+                WorkInfo.State.CANCELLED -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.outline
+            }
+
+            Icon(
+                imageVector = icon,
+                contentDescription = workInfo.state.name,
+                tint = iconColor
+            )
         }
     }
 }

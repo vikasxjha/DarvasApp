@@ -29,6 +29,22 @@ class DarvasBoxAnalysisWorker(
         return try {
             Log.d(TAG, "Starting Darvas Box analysis at ${getCurrentTimeIST()}")
 
+            // Check if we're in market hours (9 AM - 5 PM IST, weekdays only)
+            val calendar = Calendar.getInstance(TimeZone.getTimeZone("Asia/Kolkata"))
+            val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+            val dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK)
+            val isWeekday = dayOfWeek >= Calendar.MONDAY && dayOfWeek <= Calendar.FRIDAY
+            val isMarketHours = isWeekday && currentHour >= 9 && currentHour < 17
+
+            // If not in market hours, skip analysis but return success
+            if (!isMarketHours) {
+                val dayNames = arrayOf("", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+                Log.d(TAG, "Analysis skipped - outside market hours. Current: ${dayNames[dayOfWeek]} ${currentHour}:${calendar.get(Calendar.MINUTE)}")
+                return Result.success()
+            }
+
+            Log.d(TAG, "Within market hours - proceeding with analysis")
+
             // Fetch suitable symbols from Google Sheets
             val symbolsResult = googleSheetsService.fetchSuitableSymbols(GOOGLE_SHEET_URL)
 

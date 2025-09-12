@@ -2,6 +2,7 @@ package com.example.darvasbox.data.repository
 
 import com.example.darvasbox.data.dao.StockDataDao
 import com.example.darvasbox.data.model.StockData
+import com.example.darvasbox.data.model.SignalType
 import com.example.darvasbox.data.network.StockApiService
 import com.example.darvasbox.data.network.YFinanceService
 import kotlinx.coroutines.flow.Flow
@@ -77,7 +78,7 @@ class SimpleStockRepository(
             DarvasAnalysis(
                 boxHigh = yfinanceData.dayHigh,
                 boxLow = yfinanceData.dayLow,
-                signal = "IGNORE"
+                signal = SignalType.IGNORE
             )
         }
 
@@ -169,7 +170,7 @@ class SimpleStockRepository(
             val recentPrices = priceData.takeLast(5)
             val boxHigh = recentPrices.maxOf { it.high }
             val boxLow = recentPrices.minOf { it.low }
-            return DarvasAnalysis(boxHigh, boxLow, "IGNORE")
+            return DarvasAnalysis(boxHigh, boxLow, SignalType.IGNORE)
         }
 
         // Find confirmed box high using proper Darvas algorithm
@@ -247,16 +248,16 @@ class SimpleStockRepository(
     }
 
     private fun generateSignal(currentPrice: Double, currentVolume: Long, avgVolume: Double,
-                             boxHigh: Double, boxLow: Double, volumeMultiplier: Double = 1.2): String {
+                             boxHigh: Double, boxLow: Double, volumeMultiplier: Double = 1.2): SignalType {
         return when {
             // BUY Signal: Breakout above box high with volume confirmation
-            currentPrice > boxHigh && currentVolume > (avgVolume * volumeMultiplier) -> "BUY"
+            currentPrice > boxHigh && currentVolume > (avgVolume * volumeMultiplier) -> SignalType.BUY
 
             // SELL Signal: Breakdown below box low
-            currentPrice < boxLow -> "SELL"
+            currentPrice < boxLow -> SignalType.SELL
 
             // IGNORE: Price within box boundaries or breakout without volume
-            else -> "IGNORE"
+            else -> SignalType.IGNORE
         }
     }
 
@@ -280,5 +281,5 @@ data class PriceBar(
 data class DarvasAnalysis(
     val boxHigh: Double,
     val boxLow: Double,
-    val signal: String
+    val signal: SignalType
 )

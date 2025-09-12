@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.darvasbox.DarvasBoxApplication
 import com.example.darvasbox.data.model.StockData
+import com.example.darvasbox.data.model.SignalType
 import com.example.darvasbox.ui.viewmodel.StockAnalysisViewModel
 import com.example.darvasbox.ui.viewmodel.StockAnalysisViewModelFactory
 import java.util.Locale
@@ -299,8 +300,8 @@ fun StockAnalysisCard(stock: StockData) {
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = when (stock.signal) {
-                        "BUY" -> Color.Green.copy(alpha = 0.1f)
-                        "SELL" -> Color.Red.copy(alpha = 0.1f)
+                        SignalType.BUY -> Color.Green.copy(alpha = 0.1f)
+                        SignalType.SELL -> Color.Red.copy(alpha = 0.1f)
                         else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     }
                 )
@@ -317,8 +318,8 @@ fun StockAnalysisCard(stock: StockData) {
                     Spacer(modifier = Modifier.height(4.dp))
 
                     val explanation = when (stock.signal) {
-                        "BUY" -> "Price broke above box high (₹${String.format(Locale.getDefault(), "%.2f", stock.boxHigh)}) with strong volume"
-                        "SELL" -> "Price broke below box low (₹${String.format(Locale.getDefault(), "%.2f", stock.boxLow)})"
+                        SignalType.BUY -> "Price broke above box high (₹${String.format(Locale.getDefault(), "%.2f", stock.boxHigh)}) with strong volume"
+                        SignalType.SELL -> "Price broke below box low (₹${String.format(Locale.getDefault(), "%.2f", stock.boxLow)})"
                         else -> "Price is within the Darvas Box range. Wait for breakout or breakdown."
                     }
 
@@ -344,7 +345,7 @@ fun StockAnalysisCard(stock: StockData) {
                     )
 
                     // Show volume status for breakouts
-                    if (stock.signal == "BUY") {
+                    if (stock.signal == SignalType.BUY) {
                         Text(
                             text = "High Volume ✓",
                             style = MaterialTheme.typography.bodySmall,
@@ -388,10 +389,10 @@ fun StockItem(stock: StockData) {
 }
 
 @Composable
-fun SignalChip(signal: String) {
+fun SignalChip(signal: SignalType) {
     val (backgroundColor, textColor) = when (signal) {
-        "BUY" -> Color.Green to Color.White
-        "SELL" -> Color.Red to Color.White
+        SignalType.BUY -> Color.Green to Color.White
+        SignalType.SELL -> Color.Red to Color.White
         else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
 
@@ -404,7 +405,7 @@ fun SignalChip(signal: String) {
         shape = RoundedCornerShape(16.dp)
     ) {
         Text(
-            text = signal,
+            text = signal.displayName,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
             color = textColor,
             fontSize = 12.sp,

@@ -61,7 +61,7 @@ class ManualAnalysisService(
                             StockAnalysisResult(
                                 symbol = symbol,
                                 currentPrice = stockData.price,
-                                signal = stockData.signal,
+                                signal = stockData.signal.displayName, // Convert SignalType to String
                                 boxHigh = stockData.boxHigh,
                                 boxLow = stockData.boxLow,
                                 volume = stockData.volume,

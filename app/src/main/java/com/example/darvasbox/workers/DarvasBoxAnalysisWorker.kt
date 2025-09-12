@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import com.example.darvasbox.data.network.GoogleSheetsService
 import com.example.darvasbox.data.repository.SimpleStockRepository
 import com.example.darvasbox.notification.NotificationHelper
+import com.example.darvasbox.data.model.SignalType
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
@@ -22,7 +23,7 @@ class DarvasBoxAnalysisWorker(
     companion object {
         const val TAG = "DarvasBoxAnalysisWorker"
         const val GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1paWhSx9l-sJBYfJBTON0zPgTcuTVqPuUSQGv5NTWgH0/edit?usp=sharing"
-        private val previousSignals = mutableMapOf<String, String>() // Track previous signals to detect new ones
+        private val previousSignals = mutableMapOf<String, SignalType>() // Track previous signals with type safety
     }
 
     override suspend fun doWork(): Result {
@@ -82,7 +83,7 @@ class DarvasBoxAnalysisWorker(
                             com.example.darvasbox.data.model.StockAnalysisResult(
                                 symbol = symbol,
                                 currentPrice = stockData.price,
-                                signal = currentSignal,
+                                signal = currentSignal.displayName, // Convert SignalType to string for compatibility
                                 boxHigh = stockData.boxHigh,
                                 boxLow = stockData.boxLow,
                                 volume = stockData.volume,
@@ -90,22 +91,18 @@ class DarvasBoxAnalysisWorker(
                             )
                         )
 
-                        // Check if this is a new BUY or SELL signal
-                        if ((currentSignal == "BUY" || currentSignal == "SELL") &&
-                            currentSignal != previousSignal) {
+                        // Check for specific signal transitions that warrant notifications
+                        // Only notify for: BUY→SELL, SELL→BUY, IGNORE→BUY, BUY→IGNORE
+                        if (notificationHelper.shouldNotifyForSignalChange(previousSignal, currentSignal)) {
+                            Log.d(TAG, "Signal transition detected for $symbol: $previousSignal → $currentSignal")
 
-                            Log.d(TAG, "New $currentSignal signal for $symbol")
-
-                            // Show notification for new signal
-                            notificationHelper.showSignalNotification(stockData)
+                            // Show notification for this specific transition
+                            notificationHelper.showSignalChangeNotification(stockData, previousSignal ?: SignalType.UNKNOWN)
                             newSignalsCount++
-
-                            // Update previous signal
-                            previousSignals[symbol] = currentSignal
-                        } else if (currentSignal == "IGNORE") {
-                            // Update to IGNORE if that's the current state
-                            previousSignals[symbol] = currentSignal
                         }
+
+                        // Always update the previous signal to current state
+                        previousSignals[symbol] = currentSignal
 
                         Log.d(TAG, "Analyzed $symbol: Price=${stockData.price}, Signal=$currentSignal, " +
                                 "BoxHigh=${stockData.boxHigh}, BoxLow=${stockData.boxLow}")

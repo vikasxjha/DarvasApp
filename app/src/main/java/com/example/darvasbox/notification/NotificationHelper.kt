@@ -9,22 +9,18 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.darvasbox.MainActivity
-import com.example.darvasbox.R
 import com.example.darvasbox.data.model.StockData
+import com.example.darvasbox.data.model.SignalType
 
 class NotificationHelper(private val context: Context) {
 
     companion object {
         const val CHANNEL_ID = "darvas_box_signals"
-        const val CHANNEL_NAME = "Darvas Box Trading Signals"
-        const val CHANNEL_DESCRIPTION = "Notifications for new BUY/SELL signals from Darvas Box analysis"
-        const val ANALYSIS_CHANNEL_ID = "darvas_box_analysis"
-        const val ANALYSIS_CHANNEL_NAME = "Darvas Box Analysis Complete"
-        const val ANALYSIS_CHANNEL_DESCRIPTION = "Notifications when periodic analysis is completed"
-
-        // Intent extras for deep linking
-        const val EXTRA_SHOW_RESULTS = "show_analysis_results"
-        const val EXTRA_ANALYSIS_DATA = "analysis_data"
+        const val CHANNEL_NAME = "Darvas Box Signal Changes"
+        const val CHANNEL_DESCRIPTION = "Notifications for stock signal changes"
+        const val EXTRA_SHOW_RESULTS = "extra_show_results"
+        const val EXTRA_ANALYSIS_DATA = "extra_analysis_data"
+        private var notificationId = 1000
     }
 
     init {
@@ -33,10 +29,7 @@ class NotificationHelper(private val context: Context) {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = context.getSystemService(NotificationManager::class.java)
-
-            // Create signal channel
-            val signalChannel = NotificationChannel(
+            val channel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_HIGH
@@ -46,43 +39,73 @@ class NotificationHelper(private val context: Context) {
                 enableLights(true)
             }
 
-            // Create analysis completion channel
-            val analysisChannel = NotificationChannel(
-                ANALYSIS_CHANNEL_ID,
-                ANALYSIS_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = ANALYSIS_CHANNEL_DESCRIPTION
-                enableVibration(true)
-                enableLights(true)
-            }
-
-            notificationManager.createNotificationChannel(signalChannel)
-            notificationManager.createNotificationChannel(analysisChannel)
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
         }
     }
 
-    fun showSignalNotification(stockData: StockData) {
+    /**
+     * Check if signal change warrants a notification based on specific transitions:
+     * - BUY → SELL
+     * - SELL → BUY
+     * - IGNORE → BUY
+     * - BUY → IGNORE
+     */
+    fun shouldNotifyForSignalChange(previousSignal: SignalType?, currentSignal: SignalType): Boolean {
+        if (previousSignal == null || previousSignal == currentSignal) return false
+
+        return when (previousSignal to currentSignal) {
+            SignalType.BUY to SignalType.SELL -> true      // Exit long position
+            SignalType.SELL to SignalType.BUY -> true      // Reversal from sell to buy
+            SignalType.IGNORE to SignalType.BUY -> true    // New buying opportunity
+            SignalType.BUY to SignalType.IGNORE -> true    // Exit buy signal (false breakout)
+            else -> false                                  // All other transitions ignored
+        }
+    }
+
+    /**
+     * Overloaded method for backward compatibility with string signals
+     */
+    fun shouldNotifyForSignalChange(previousSignal: String?, currentSignal: String): Boolean {
+        val prevSignalType = previousSignal?.let { SignalType.fromString(it) }
+        val currSignalType = SignalType.fromString(currentSignal)
+        return shouldNotifyForSignalChange(prevSignalType, currSignalType)
+    }
+
+    /**
+     * Show notification for significant signal changes
+     */
+    fun showSignalChangeNotification(stockData: StockData, previousSignal: SignalType) {
+        val currentSignal = stockData.signal
+
+        if (!shouldNotifyForSignalChange(previousSignal, currentSignal)) {
+            return
+        }
+
+        val transitionMessage = getTransitionMessage(previousSignal, currentSignal)
+        val actionMessage = getActionMessage(previousSignal, currentSignal)
+
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra("stock_symbol", stockData.symbol)
         }
 
         val pendingIntent = PendingIntent.getActivity(
             context,
-            stockData.symbol.hashCode(),
+            0,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = "${stockData.signal} Signal: ${stockData.symbol}"
-        val message = buildNotificationMessage(stockData)
-
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(getSignalIcon(stockData.signal))
-            .setContentTitle(title)
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("${stockData.symbol} - $transitionMessage")
+            .setContentText("$actionMessage\nPrice: ₹${String.format("%.2f", stockData.price)}")
+            .setStyle(NotificationCompat.BigTextStyle()
+                .bigText("$actionMessage\n" +
+                        "Price: ₹${String.format("%.2f", stockData.price)}\n" +
+                        "Box High: ₹${String.format("%.2f", stockData.boxHigh)}\n" +
+                        "Box Low: ₹${String.format("%.2f", stockData.boxLow)}\n" +
+                        "Change: ${if (stockData.change >= 0) "+" else ""}${String.format("%.2f", stockData.change)} (${String.format("%.2f", stockData.changePercent)}%)"))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
@@ -90,57 +113,49 @@ class NotificationHelper(private val context: Context) {
             .build()
 
         try {
-            NotificationManagerCompat.from(context).notify(
-                stockData.symbol.hashCode(),
-                notification
-            )
+            NotificationManagerCompat.from(context).notify(++notificationId, notification)
         } catch (e: SecurityException) {
-            // Handle case where notification permission is not granted
+            // Handle notification permission not granted
             android.util.Log.w("NotificationHelper", "Notification permission not granted", e)
         }
     }
 
-    private fun buildNotificationMessage(stockData: StockData): String {
-        val changeText = if ((stockData.change ?: 0.0) >= 0) "+${String.format("%.2f", stockData.change ?: 0.0)}"
-                        else String.format("%.2f", stockData.change ?: 0.0)
-        val changePercentText = if ((stockData.changePercent ?: 0.0) >= 0) "+${String.format("%.2f", stockData.changePercent ?: 0.0)}%"
-                               else "${String.format("%.2f", stockData.changePercent ?: 0.0)}%"
+    /**
+     * Overloaded method for backward compatibility with string signals
+     */
+    fun showSignalChangeNotification(stockData: StockData, previousSignal: String) {
+        val prevSignalType = SignalType.fromString(previousSignal)
+        showSignalChangeNotification(stockData, prevSignalType)
+    }
 
-        return when (stockData.signal) {
-            "BUY" -> "Price: ₹${String.format("%.2f", stockData.price)} ($changeText, $changePercentText)\n" +
-                    "Breakout above box high: ₹${String.format("%.2f", stockData.boxHigh)}\n" +
-                    "Volume: ${formatVolume(stockData.volume ?: 0L)}"
-
-            "SELL" -> "Price: ₹${String.format("%.2f", stockData.price)} ($changeText, $changePercentText)\n" +
-                     "Breakdown below box low: ₹${String.format("%.2f", stockData.boxLow)}\n" +
-                     "Volume: ${formatVolume(stockData.volume ?: 0L)}"
-
-            else -> "Price: ₹${String.format("%.2f", stockData.price)} ($changeText, $changePercentText)"
+    private fun getTransitionMessage(previousSignal: SignalType, currentSignal: SignalType): String {
+        return when (previousSignal to currentSignal) {
+            SignalType.BUY to SignalType.SELL -> "BUY → SELL Signal"
+            SignalType.SELL to SignalType.BUY -> "SELL → BUY Signal"
+            SignalType.IGNORE to SignalType.BUY -> "New BUY Signal"
+            SignalType.BUY to SignalType.IGNORE -> "BUY Signal Ended"
+            else -> "Signal Changed"
         }
     }
 
-    private fun getSignalIcon(signal: String): Int {
-        return when (signal) {
-            "BUY" -> android.R.drawable.ic_menu_add
-            "SELL" -> android.R.drawable.ic_menu_delete
-            else -> android.R.drawable.ic_dialog_info
+    private fun getActionMessage(previousSignal: SignalType, currentSignal: SignalType): String {
+        return when (previousSignal to currentSignal) {
+            SignalType.BUY to SignalType.SELL -> "⚠️ Consider selling your position - price broke below support"
+            SignalType.SELL to SignalType.BUY -> "🔄 Reversal detected - consider buying opportunity"
+            SignalType.IGNORE to SignalType.BUY -> "🚀 New buying opportunity detected with volume confirmation"
+            SignalType.BUY to SignalType.IGNORE -> "⏸️ Buy signal weakened - monitor closely or consider exit"
+            else -> "Signal status changed"
         }
     }
 
-    private fun formatVolume(volume: Long): String {
-        return when {
-            volume >= 10_000_000 -> "${String.format("%.1f", volume / 1_000_000.0)}M"
-            volume >= 100_000 -> "${String.format("%.1f", volume / 100_000.0)}L"
-            volume >= 1_000 -> "${String.format("%.1f", volume / 1_000.0)}K"
-            else -> volume.toString()
-        }
-    }
-
+    /**
+     * Show analysis completion notification
+     */
     fun showAnalysisCompleteNotification(
         symbolCount: Int,
         buySignals: Int,
         sellSignals: Int,
-        analysisData: String // JSON string of analysis results
+        analysisData: String
     ) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -150,49 +165,51 @@ class NotificationHelper(private val context: Context) {
 
         val pendingIntent = PendingIntent.getActivity(
             context,
-            "analysis_complete".hashCode(),
+            0,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = "📊 Analysis Complete"
-        val message = "Analyzed $symbolCount stocks • $buySignals BUY • $sellSignals SELL signals found"
-        val bigMessage = buildAnalysisNotificationMessage(symbolCount, buySignals, sellSignals)
-
-        val notification = NotificationCompat.Builder(context, ANALYSIS_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(title)
-            .setContentText(message)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(bigMessage))
+            .setContentTitle("Analysis Complete")
+            .setContentText("Analyzed $symbolCount stocks: $buySignals BUY, $sellSignals SELL")
+            .setStyle(NotificationCompat.BigTextStyle()
+                .bigText("Complete analysis finished\n" +
+                        "Stocks analyzed: $symbolCount\n" +
+                        "BUY signals: $buySignals\n" +
+                        "SELL signals: $sellSignals\n" +
+                        "Tap to view detailed results"))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .addAction(
-                android.R.drawable.ic_menu_view,
-                "View Results",
-                pendingIntent
-            )
             .build()
 
         try {
-            NotificationManagerCompat.from(context).notify(
-                "analysis_complete".hashCode(),
-                notification
-            )
+            NotificationManagerCompat.from(context).notify(++notificationId, notification)
         } catch (e: SecurityException) {
             android.util.Log.w("NotificationHelper", "Notification permission not granted", e)
         }
     }
 
-    private fun buildAnalysisNotificationMessage(symbolCount: Int, buySignals: Int, sellSignals: Int): String {
-        return """
-            📈 Periodic Analysis Results
-            
-            • Analyzed $symbolCount stocks from Google Sheets
-            • Found $buySignals BUY signals
-            • Found $sellSignals SELL signals
-            
-            Tap to view detailed results with price targets and volume data.
-        """.trimIndent()
+    /**
+     * Legacy method for backward compatibility
+     */
+    fun showSignalNotification(stockData: StockData) {
+        // This method is kept for backward compatibility with existing code
+        // For new notifications, use showSignalChangeNotification instead
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("${stockData.symbol} - ${stockData.signal.displayName} Signal")
+            .setContentText("Price: ₹${String.format("%.2f", stockData.price)}")
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(context).notify(++notificationId, notification)
+        } catch (e: SecurityException) {
+            android.util.Log.w("NotificationHelper", "Notification permission not granted", e)
+        }
     }
 }

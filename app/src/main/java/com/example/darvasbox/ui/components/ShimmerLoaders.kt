@@ -14,6 +14,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -381,5 +382,46 @@ fun AnalysisResultsShimmerLoader(
             StockItemShimmer()
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
+
+// Previews for Shimmer Loaders
+@Preview(showBackground = true, name = "Stock Analysis Shimmer Loader")
+@Composable
+fun StockAnalysisShimmerLoaderPreview() {
+    com.example.darvasbox.ui.theme.DarvasBoxTheme {
+        StockAnalysisShimmerLoader()
+    }
+}
+
+@Preview(showBackground = true, name = "Stock Analysis Card Shimmer")
+@Composable
+fun StockAnalysisCardShimmerPreview() {
+    com.example.darvasbox.ui.theme.DarvasBoxTheme {
+        StockAnalysisCardShimmer()
+    }
+}
+
+@Preview(showBackground = true, name = "Stock Item Shimmer")
+@Composable
+fun StockItemShimmerPreview() {
+    com.example.darvasbox.ui.theme.DarvasBoxTheme {
+        StockItemShimmer()
+    }
+}
+
+@Preview(showBackground = true, name = "Analysis Results Shimmer Loader")
+@Composable
+fun AnalysisResultsShimmerLoaderPreview() {
+    com.example.darvasbox.ui.theme.DarvasBoxTheme {
+        AnalysisResultsShimmerLoader()
+    }
+}
+
+@Preview(showBackground = true, name = "Dark Theme - Stock Analysis Shimmer")
+@Composable
+fun StockAnalysisShimmerLoaderDarkPreview() {
+    com.example.darvasbox.ui.theme.DarvasBoxTheme(darkTheme = true) {
+        StockAnalysisShimmerLoader()
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.darvasbox.data.model.SheetsAnalysisResult
 import com.example.darvasbox.data.model.StockAnalysisResult
@@ -375,5 +376,89 @@ private fun StockResultCard(stockResult: StockAnalysisResult) {
                 )
             }
         }
+    }
+}
+
+// Previews for AnalysisResultsScreen
+@Preview(showBackground = true, name = "Analysis Results Screen")
+@Composable
+fun AnalysisResultsScreenPreview() {
+    com.example.darvasbox.ui.theme.DarvasBoxTheme {
+        val mockAnalysisResult = SheetsAnalysisResult(
+            symbols = listOf("RELIANCE", "TCS", "INFY", "WIPRO", "HDFCBANK"),
+            timestamp = "2024-01-15 14:30:00 IST",
+            success = true,
+            analysisResults = listOf(
+                StockAnalysisResult(
+                    symbol = "RELIANCE",
+                    currentPrice = 2650.75,
+                    signal = "BUY",
+                    boxHigh = 2680.0,
+                    boxLow = 2550.0,
+                    volume = 1200000L,
+                    analysisSuccess = true
+                ),
+                StockAnalysisResult(
+                    symbol = "TCS",
+                    currentPrice = 3250.30,
+                    signal = "SELL",
+                    boxHigh = 3300.0,
+                    boxLow = 3200.0,
+                    volume = 890000L,
+                    analysisSuccess = true
+                ),
+                StockAnalysisResult(
+                    symbol = "INFY",
+                    currentPrice = 1890.50,
+                    signal = "IGNORE",
+                    boxHigh = 1950.0,
+                    boxLow = 1850.0,
+                    volume = 750000L,
+                    analysisSuccess = true
+                ),
+                StockAnalysisResult(
+                    symbol = "WIPRO",
+                    currentPrice = null,
+                    signal = "ERROR",
+                    boxHigh = null,
+                    boxLow = null,
+                    volume = null,
+                    analysisSuccess = false,
+                    errorMessage = "Failed to fetch data"
+                )
+            )
+        )
+
+        AnalysisResultsScreen(
+            analysisResult = mockAnalysisResult,
+            onBackClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Dark Theme - Analysis Results")
+@Composable
+fun AnalysisResultsScreenDarkPreview() {
+    com.example.darvasbox.ui.theme.DarvasBoxTheme(darkTheme = true) {
+        AnalysisResultsScreenPreview()
+    }
+}
+
+@Preview(showBackground = true, name = "Error State - Analysis Results")
+@Composable
+fun AnalysisResultsScreenErrorPreview() {
+    com.example.darvasbox.ui.theme.DarvasBoxTheme {
+        val errorAnalysisResult = SheetsAnalysisResult(
+            symbols = emptyList(),
+            timestamp = "2024-01-15 14:30:00 IST",
+            success = false,
+            errorMessage = "Failed to connect to Google Sheets API",
+            analysisResults = emptyList()
+        )
+
+        AnalysisResultsScreen(
+            analysisResult = errorAnalysisResult,
+            onBackClick = {}
+        )
     }
 }

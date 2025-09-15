@@ -85,6 +85,9 @@ dependencies {
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended:1.5.4")
 
+    // Shimmer Effect for loading animations
+    implementation("com.valentinilk.shimmer:compose-shimmer:1.2.0")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

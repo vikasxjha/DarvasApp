@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -419,5 +420,274 @@ private fun formatVolume(volume: Long): String {
         volume >= 100_000 -> "${String.format(Locale.getDefault(), "%.1f", volume / 100_000.0)}L"
         volume >= 1_000 -> "${String.format(Locale.getDefault(), "%.1f", volume / 1_000.0)}K"
         else -> volume.toString()
+    }
+}
+
+// Previews for StockAnalysisScreen
+@Preview(showBackground = true, name = "Stock Analysis Screen")
+@Composable
+fun StockAnalysisScreenPreview() {
+    com.example.darvasbox.ui.theme.DarvasBoxTheme {
+        // Mock UI without ViewModel dependencies
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Search Section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Stock Analysis",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = "RELIANCE",
+                        onValueChange = {},
+                        label = { Text("Enter stock symbol (e.g., RELIANCE, TCS)") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search"
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {},
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Analyze Stock")
+                    }
+                }
+            }
+
+            // Mock Analysis Result
+            StockAnalysisResultCardPreview()
+
+            // Recent Stocks Section
+            Text(
+                text = "Recent Analysis",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            repeat(3) {
+                StockItemPreview(
+                    symbol = listOf("TCS", "INFY", "WIPRO")[it],
+                    price = listOf(3250.75, 1890.30, 445.60)[it],
+                    signal = listOf("BUY", "SELL", "IGNORE")[it]
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun StockAnalysisResultCardPreview() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "RELIANCE",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Surface(
+                    modifier = Modifier.background(
+                        Color.Green,
+                        RoundedCornerShape(16.dp)
+                    ),
+                    color = Color.Green,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(
+                        text = "BUY",
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Price and Box Info
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Current Price",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = "₹2,650.75",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "+2.35% (+60.50)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Green,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Darvas Box",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = "High: ₹2,680.00",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Low: ₹2,550.00",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Range: 5.1%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Signal Explanation
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp)
+                ) {
+                    Text(
+                        text = "📈 BUY Signal",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Price has broken above the Darvas Box high of ₹2,680.00, indicating a potential upward trend.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Volume Info
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Volume: 1.2M",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = "Last Updated: 2 min ago",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun StockItemPreview(
+    symbol: String,
+    price: Double,
+    signal: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = symbol,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "₹${String.format("%.2f", price)}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Surface(
+                modifier = Modifier.background(
+                    when (signal) {
+                        "BUY" -> Color.Green
+                        "SELL" -> Color.Red
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    RoundedCornerShape(16.dp)
+                ),
+                color = when (signal) {
+                    "BUY" -> Color.Green
+                    "SELL" -> Color.Red
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                },
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = signal,
+                    color = if (signal == "BUY" || signal == "SELL") Color.White
+                           else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Dark Theme - Stock Analysis")
+@Composable
+fun StockAnalysisScreenDarkPreview() {
+    com.example.darvasbox.ui.theme.DarvasBoxTheme(darkTheme = true) {
+        StockAnalysisScreenPreview()
     }
 }
